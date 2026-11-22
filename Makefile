@@ -1,4 +1,4 @@
-VERSION := 0.2.0-1
+VERSION := 0.3.0-1
 PKG     := pve-secrets-manager
 BUILD   := build
 DEB     := $(BUILD)/$(PKG)_$(VERSION)_all.deb

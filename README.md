@@ -53,6 +53,12 @@ Clients use `https://<vip>:8200` with the PVE cluster CA
 (`/etc/pve/pve-root-ca.pem`). The admin token for the Proxmox side is in
 `/etc/pve/priv/pve-secrets/admin.token`.
 
+## Guests
+
+Guests in a pool log in with their pve-identity token and read
+`secret/pool/<pool>/...` and their own `secret/guest/<vmid>-<gen>/...`, with
+the stock OpenBao Agent. See [docs/guests.md](docs/guests.md).
+
 ## Backup and recovery
 
 Set a backup storage in Datacenter → Secrets → Backup; the active node takes
