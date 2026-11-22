@@ -42,7 +42,7 @@ __PACKAGE__->register_method({
     parameters => { additionalProperties => 0, properties => {} },
     returns => { type => 'array', items => { type => 'object', properties => {} },
         links => [{ rel => 'child', href => '{name}' }] },
-    code => sub { return [{ name => 'status' }, { name => 'init' }, { name => 'backup' }] },
+    code => sub { return [{ name => 'status' }, { name => 'init' }, { name => 'backup' }, { name => 'k8s' }] },
 });
 
 __PACKAGE__->register_method({
@@ -144,6 +144,74 @@ __PACKAGE__->register_method({
         return $rpcenv->fork_worker('pvesecretsbackup', undef, $user, sub {
             run_command([$CLI, 'backup', '--force'], timeout => 600);
         });
+    },
+});
+
+my sub cli_run {
+    my ($input, @args) = @_;
+    my $err = '';
+    eval { run_command([$CLI, @args], input => $input, errfunc => sub { $err .= "$_[0]\n" },
+        timeout => 120) };
+    if ($@) {
+        $err =~ s/^pve-secrets: //mg;
+        raise((($err || $@) =~ s/\s+$//r) . "\n", code => 400);
+    }
+}
+
+__PACKAGE__->register_method({
+    name => 'k8s_list',
+    path => 'k8s',
+    method => 'GET',
+    protected => 1,
+    description => "Registered Kubernetes clusters (service-account issuers).",
+    permissions => { check => ['perm', '/', ['Sys.Audit']] },
+    parameters => { additionalProperties => 0, properties => {} },
+    returns => { type => 'array', items => { type => 'object' },
+        links => [{ rel => 'child', href => '{cluster}' }] },
+    code => sub { return cli_json('k8s-list', '--json') },
+});
+
+__PACKAGE__->register_method({
+    name => 'k8s_register',
+    path => 'k8s/{cluster}',
+    method => 'PUT',
+    protected => 1,
+    description => "Register or update a Kubernetes cluster: its service-account"
+        . " issuer and public keys. Pods then read secret/k8s/{cluster}/<namespace>/*.",
+    permissions => { check => ['perm', '/', ['Sys.Modify']] },
+    parameters => {
+        additionalProperties => 0,
+        properties => {
+            cluster => { type => 'string', pattern => '[a-z0-9][a-z0-9-]{0,39}' },
+            issuer => { type => 'string', maxLength => 512,
+                description => "Service-account issuer URL (the 'iss' claim)." },
+            jwks => { type => 'string', maxLength => 65536,
+                description => "JWKS JSON (/openid/v1/jwks) or PEM public keys." },
+        },
+    },
+    returns => { type => 'null' },
+    code => sub {
+        my ($p) = @_;
+        cli_run($p->{jwks}, 'k8s-register', '--cluster', $p->{cluster},
+            '--issuer', $p->{issuer}, '--jwks', '-');
+        return undef;
+    },
+});
+
+__PACKAGE__->register_method({
+    name => 'k8s_unregister',
+    path => 'k8s/{cluster}',
+    method => 'DELETE',
+    protected => 1,
+    description => "Unregister a Kubernetes cluster (removes its login; secrets stay).",
+    permissions => { check => ['perm', '/', ['Sys.Modify']] },
+    parameters => { additionalProperties => 0,
+        properties => { cluster => { type => 'string', pattern => '[a-z0-9][a-z0-9-]{0,39}' } } },
+    returns => { type => 'null' },
+    code => sub {
+        my ($p) = @_;
+        cli_run(undef, 'k8s-unregister', '--cluster', $p->{cluster});
+        return undef;
     },
 });
 

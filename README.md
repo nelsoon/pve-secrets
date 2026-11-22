@@ -59,6 +59,12 @@ Guests in a pool log in with their pve-identity token and read
 `secret/pool/<pool>/...` and their own `secret/guest/<vmid>-<gen>/...`, with
 the stock OpenBao Agent. See [docs/guests.md](docs/guests.md).
 
+## Kubernetes
+
+A Kubernetes cluster registers its service-account issuer keys; its pods then
+read `secret/k8s/<cluster>/<namespace>/...` with their own service-account
+token. See [docs/kubernetes.md](docs/kubernetes.md).
+
 ## Backup and recovery
 
 Set a backup storage in Datacenter → Secrets → Backup; the active node takes
