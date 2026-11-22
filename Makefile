@@ -1,4 +1,4 @@
-VERSION := 0.1.0-1
+VERSION := 0.2.0-1
 PKG     := pve-secrets-manager
 BUILD   := build
 DEB     := $(BUILD)/$(PKG)_$(VERSION)_all.deb
@@ -27,6 +27,7 @@ deb:
 	install -m755 bin/pve-secrets $(R)/usr/sbin/
 	install -m755 debian/health $(R)/usr/lib/pve-secrets/health
 	install -m644 debian/pve-secrets-converge.service debian/pve-secrets-converge.timer \
+	  debian/pve-secrets-backup.service debian/pve-secrets-backup.timer \
 	  debian/pve-secrets-vip.service $(R)/lib/systemd/system/
 	install -m644 debian/openbao-pve-secrets.conf $(R)/lib/systemd/system/openbao.service.d/pve-secrets.conf
 	install -m644 debian/logrotate $(R)/etc/logrotate.d/pve-secrets

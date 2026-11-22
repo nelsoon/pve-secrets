@@ -12,6 +12,7 @@ use warnings;
 
 use JSON;
 use PVE::Exception qw(raise);
+use PVE::RPCEnvironment;
 use PVE::Tools qw(run_command);
 
 use base qw(PVE::RESTHandler);
@@ -41,7 +42,7 @@ __PACKAGE__->register_method({
     parameters => { additionalProperties => 0, properties => {} },
     returns => { type => 'array', items => { type => 'object', properties => {} },
         links => [{ rel => 'child', href => '{name}' }] },
-    code => sub { return [{ name => 'status' }, { name => 'init' }] },
+    code => sub { return [{ name => 'status' }, { name => 'init' }, { name => 'backup' }] },
 });
 
 __PACKAGE__->register_method({
@@ -91,6 +92,58 @@ __PACKAGE__->register_method({
             push @a, "--$k", $param->{$k} if defined $param->{$k};
         }
         return cli_json(@a);
+    },
+});
+
+__PACKAGE__->register_method({
+    name => 'backup_config',
+    path => 'backup',
+    method => 'PUT',
+    protected => 1,
+    description => "Set where and how often Raft snapshots are taken.",
+    permissions => { check => ['perm', '/', ['Sys.Modify']] },
+    parameters => {
+        additionalProperties => 0,
+        properties => {
+            storage => { type => 'string', format => 'pve-storage-id',
+                description => "PVE storage with 'backup' content." },
+            keep => { type => 'integer', minimum => 1, maximum => 1000, optional => 1,
+                default => 14, description => "Snapshots to keep." },
+            interval => { type => 'integer', minimum => 1, maximum => 720, optional => 1,
+                default => 24, description => "Hours between snapshots." },
+        },
+    },
+    returns => { type => 'null' },
+    code => sub {
+        my ($param) = @_;
+        my @a = ('backup-config', '--storage', $param->{storage});
+        push @a, '--keep', $param->{keep} if defined $param->{keep};
+        push @a, '--interval', $param->{interval} if defined $param->{interval};
+        my $err = '';
+        eval { run_command([$CLI, @a], errfunc => sub { $err .= "$_[0]\n" }, timeout => 60) };
+        if ($@) {
+            $err =~ s/^pve-secrets: //mg;
+            raise((($err || $@) =~ s/\s+$//r) . "\n", code => 400);
+        }
+        return undef;
+    },
+});
+
+__PACKAGE__->register_method({
+    name => 'backup_now',
+    path => 'backup',
+    method => 'POST',
+    protected => 1,
+    description => "Take a Raft snapshot now (task).",
+    permissions => { check => ['perm', '/', ['Sys.Modify']] },
+    parameters => { additionalProperties => 0, properties => {} },
+    returns => { type => 'string', description => 'Task UPID.' },
+    code => sub {
+        my $rpcenv = PVE::RPCEnvironment::get();
+        my $user = $rpcenv->get_user();
+        return $rpcenv->fork_worker('pvesecretsbackup', undef, $user, sub {
+            run_command([$CLI, 'backup', '--force'], timeout => 600);
+        });
     },
 });
 

@@ -53,6 +53,13 @@ Clients use `https://<vip>:8200` with the PVE cluster CA
 (`/etc/pve/pve-root-ca.pem`). The admin token for the Proxmox side is in
 `/etc/pve/priv/pve-secrets/admin.token`.
 
+## Backup and recovery
+
+Set a backup storage in Datacenter → Secrets → Backup; the active node takes
+encrypted Raft snapshots on a schedule. Keep the recovery keys and the seal
+key (`pve-secrets export-seal-key`) offline: together with a snapshot they
+restore the store on a rebuilt cluster. See [docs/recovery.md](docs/recovery.md).
+
 ## Uninstall
 
 Removing the package stops the timer and the VRRP address. Purging keeps the

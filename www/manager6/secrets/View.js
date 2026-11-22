@@ -178,6 +178,50 @@ Ext.define('PVE.secrets.Setup', {
     },
 });
 
+Ext.define('PVE.secrets.BackupEdit', {
+    extend: 'Proxmox.window.Edit',
+    alias: 'widget.pveSecretsBackupEdit',
+
+    subject: gettext('Backup'),
+    url: '/api2/extjs/cluster/secrets/backup',
+    method: 'PUT',
+    width: 460,
+
+    items: [
+        {
+            xtype: 'pveStorageSelector',
+            name: 'storage',
+            fieldLabel: gettext('Storage'),
+            storageContent: 'backup',
+            nodename: 'localhost',
+            allowBlank: false,
+        },
+        {
+            xtype: 'proxmoxintegerfield',
+            name: 'interval',
+            fieldLabel: gettext('Every (hours)'),
+            minValue: 1,
+            maxValue: 720,
+            value: 24,
+        },
+        {
+            xtype: 'proxmoxintegerfield',
+            name: 'keep',
+            fieldLabel: gettext('Keep'),
+            minValue: 1,
+            maxValue: 1000,
+            value: 14,
+        },
+        {
+            xtype: 'displayfield',
+            userCls: 'pmx-hint',
+            value: gettext('Snapshots are encrypted by the store. Restoring one on a rebuilt ' +
+                'cluster needs the seal key (pve-secrets export-seal-key, as root) and 3 ' +
+                'recovery keys: keep the seal key offline with the recovery keys.'),
+        },
+    ],
+});
+
 Ext.define('PVE.secrets.View', {
     extend: 'Ext.panel.Panel',
     alias: 'widget.pveSecretsView',
@@ -218,6 +262,51 @@ Ext.define('PVE.secrets.View', {
             handler: () => Ext.create('PVE.secrets.Setup', { onDone: () => me.reload() }).show(),
         });
 
+        let backupBtn = Ext.create('Ext.button.Button', {
+            text: gettext('Backup'),
+            iconCls: 'fa fa-floppy-o',
+            hidden: true,
+            disabled: !canSetup,
+            handler: () => {
+                let win = Ext.create('PVE.secrets.BackupEdit', {
+                    listeners: { destroy: () => me.reload() },
+                });
+                if (me.backupValues) {
+                    win.setValues(me.backupValues);
+                }
+                win.show();
+            },
+        });
+        let backupNowBtn = Ext.create('Ext.button.Button', {
+            text: gettext('Back up now'),
+            hidden: true,
+            disabled: true,
+            handler: () => Proxmox.Utils.API2Request({
+                url: '/cluster/secrets/backup',
+                method: 'POST',
+                failure: (r) => Ext.Msg.alert(gettext('Error'), r.htmlStatus),
+                success: (r) => Ext.create('Proxmox.window.TaskViewer', {
+                    upid: r.result.data,
+                    autoShow: true,
+                    listeners: { destroy: () => me.reload() },
+                }),
+            }),
+        });
+        let backupText = (b) => {
+            if (!b || !b.configured) {
+                return '<i class="fa fa-exclamation-triangle warning"></i> ' +
+                    gettext('no backup storage set');
+            }
+            let t = Ext.htmlEncode(b.storage) + ', ' + Ext.String.format(gettext('every {0} h, keep {1}'),
+                b.interval, b.keep);
+            if (b.error) {
+                return t + ' <i class="fa fa-times critical"></i> ' + Ext.htmlEncode(b.error);
+            }
+            let last = b.last ? Proxmox.Utils.render_timestamp(b.last) + ' (' + b.count + ')'
+                : gettext('none yet');
+            return t + ' &nbsp; <b>' + gettext('Last') + ':</b> ' + last;
+        };
+
         me.reload = function() {
             Proxmox.Utils.API2Request({
                 url: '/cluster/secrets/status',
@@ -230,10 +319,18 @@ Ext.define('PVE.secrets.View', {
                             (canSetup ? gettext('Click "Set up" to start it on every node.')
                                 : gettext('Ask an administrator (Sys.Modify) to set it up.')));
                         setupBtn.show();
+                        backupBtn.hide();
+                        backupNowBtn.hide();
                         grid.hide();
                         return;
                     }
                     setupBtn.hide();
+                    backupBtn.show();
+                    backupNowBtn.show();
+                    backupNowBtn.setDisabled(!canSetup || !d.backup?.configured);
+                    me.backupValues = d.backup?.configured
+                        ? { storage: d.backup.storage, keep: d.backup.keep, interval: d.backup.interval }
+                        : undefined;
                     let tol = d.failure_tolerance;
                     let warn = tol === 0
                         ? ' <i class="fa fa-exclamation-triangle warning"></i> ' +
@@ -247,14 +344,15 @@ Ext.define('PVE.secrets.View', {
                         '<br><b>' + gettext('Address') + ':</b> https://' +
                         Ext.htmlEncode((d.name || d.vip.replace(/\/.*/, ''))) + ':8200' +
                         ' &nbsp; <b>' + gettext('This node') + ':</b> ' + Ext.htmlEncode(d.local) +
-                        (d.version ? ' (OpenBao ' + Ext.htmlEncode(d.version) + ')' : ''));
+                        (d.version ? ' (OpenBao ' + Ext.htmlEncode(d.version) + ')' : '') +
+                        '<br><b>' + gettext('Backup') + ':</b> ' + backupText(d.backup));
                     grid.getStore().loadData(d.servers || []);
                     grid.show();
                 },
             });
         };
 
-        me.tbar = [setupBtn, { text: gettext('Reload'), iconCls: 'fa fa-refresh', handler: () => me.reload() }];
+        me.tbar = [setupBtn, backupBtn, backupNowBtn, { text: gettext('Reload'), iconCls: 'fa fa-refresh', handler: () => me.reload() }];
         me.items = [info, grid];
         me.callParent();
         me.reload();

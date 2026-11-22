@@ -8,7 +8,7 @@ PVE_SECRETS_INTEGRATE_EOF
     if [ -z "$PREFIX" ] && [ -d /run/systemd/system ]; then
         if [ "$1" = "configure" ]; then
             systemctl daemon-reload || true
-            systemctl enable --now pve-secrets-converge.timer >/dev/null 2>&1 || true
+            systemctl enable --now pve-secrets-converge.timer pve-secrets-backup.timer >/dev/null 2>&1 || true
         fi
         if [ "$restart" = 1 ]; then
             systemctl try-restart pvedaemon.service pveproxy.service >/dev/null 2>&1 || true
