@@ -1,0 +1,11 @@
+/var/log/openbao/audit.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    postrotate
+        systemctl reload openbao >/dev/null 2>&1 || true
+    endscript
+}

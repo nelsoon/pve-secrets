@@ -1,0 +1,4 @@
+#!/bin/sh
+# keepalived check: local OpenBao unsealed (active or standby).
+exec curl -sf -o /dev/null --max-time 2 --cacert /etc/pve/pve-root-ca.pem \
+    'https://127.0.0.1:8200/v1/sys/health?standbyok=true'
