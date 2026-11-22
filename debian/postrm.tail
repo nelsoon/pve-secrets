@@ -1,0 +1,12 @@
+PVE_SECRETS_INTEGRATE_EOF
+    rm -f "$PREFIX/var/lib/pve-secrets/changed"
+    if [ -z "$PREFIX" ] && [ -d /run/systemd/system ]; then
+        systemctl daemon-reload || true
+        systemctl try-restart pvedaemon.service pveproxy.service >/dev/null 2>&1 || true
+    fi
+fi
+if [ "$1" = "purge" ]; then
+    rm -f "$PREFIX/etc/pve-secrets/keepalived.conf" "$PREFIX/var/lib/pve-secrets/integration.status"
+    rmdir "$PREFIX/etc/pve-secrets" "$PREFIX/var/lib/pve-secrets" 2>/dev/null || true
+fi
+exit 0

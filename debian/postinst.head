@@ -1,0 +1,9 @@
+#!/bin/sh
+# pve-secrets-manager postinst: apply the INTEGRATION.md points (embedded
+# from debian/integrate.pl), enable the converge timer, restart the PVE API
+# daemons when something changed. Integration failures never fail the install.
+set -e
+PREFIX="${DPKG_ROOT:-}"
+case "$1" in
+configure|triggered)
+    perl - apply "$PREFIX" <<'PVE_SECRETS_INTEGRATE_EOF' || true

@@ -1,0 +1,19 @@
+PVE_SECRETS_INTEGRATE_EOF
+    restart=0
+    [ "$1" = "configure" ] && restart=1
+    if [ -f "$PREFIX/var/lib/pve-secrets/changed" ]; then
+        rm -f "$PREFIX/var/lib/pve-secrets/changed"
+        restart=1
+    fi
+    if [ -z "$PREFIX" ] && [ -d /run/systemd/system ]; then
+        if [ "$1" = "configure" ]; then
+            systemctl daemon-reload || true
+            systemctl enable --now pve-secrets-converge.timer >/dev/null 2>&1 || true
+        fi
+        if [ "$restart" = 1 ]; then
+            systemctl try-restart pvedaemon.service pveproxy.service >/dev/null 2>&1 || true
+        fi
+    fi
+    ;;
+esac
+exit 0

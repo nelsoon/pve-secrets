@@ -1,0 +1,8 @@
+#!/bin/sh
+# pve-secrets-manager postrm: remove the integration points. Store data
+# (/var/lib/openbao) and cluster settings (/etc/pve/secrets.cfg,
+# /etc/pve/priv/pve-secrets) are kept even on purge: deleting them destroys
+# every secret (README "Uninstall").
+PREFIX="${DPKG_ROOT:-}"
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    perl - remove "$PREFIX" <<'PVE_SECRETS_INTEGRATE_EOF' || true

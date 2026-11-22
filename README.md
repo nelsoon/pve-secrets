@@ -5,7 +5,8 @@ the nodes of a Proxmox VE cluster. Guests in a resource pool log in with their
 [pve-identity](https://github.com/nelsoon/pve-identity) token, so no secret,
 password or AppRole credential is ever copied into a guest.
 
-Status: v0.1, store bring-up only (HA, unattended unseal, audit). Guest
+Status: v0.1, store bring-up (HA, unattended unseal, audit) and the
+Datacenter setup/status panel. Guest
 bindings, backup, the Proxmox API and panel, and Kubernetes come next.
 
 ## How it runs
@@ -34,12 +35,19 @@ On every node:
 apt install ./openbao_2.7.*_linux_amd64.deb ./pve-secrets-manager_*_all.deb
 ```
 
-Once per cluster, on one node:
+Once per cluster: **Datacenter → Secrets → Set up** (needs `Sys.Modify` on
+`/`), giving the client address (VRRP, CIDR) and optionally a DNS name. The
+recovery keys are shown once in that dialog, with Download and Copy; the
+dialog only closes after you confirm you saved them. They are not stored
+anywhere. Same from the shell:
 
 ```sh
 pve-secrets init --vip 192.0.2.10/24 [--name secrets.example.net]
 pve-secrets status
 ```
+
+API: `GET /cluster/secrets/status` (`Sys.Audit`), `POST /cluster/secrets/init`
+(`Sys.Modify`, synchronous so the keys never reach a task log).
 
 Clients use `https://<vip>:8200` with the PVE cluster CA
 (`/etc/pve/pve-root-ca.pem`). The admin token for the Proxmox side is in
